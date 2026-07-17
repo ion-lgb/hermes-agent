@@ -1,0 +1,117 @@
+name: Build Windows offline installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-offline-installer
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Windows x64 offline NSIS
+    runs-on: windows-latest
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install desktop build dependencies
+        shell: pwsh
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate offline PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($path in @(
+            "scripts/offline/prepare-windows-payload.ps1",
+            "scripts/offline/install-offline.ps1"
+          )) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              $errors | ForEach-Object { Write-Error "$path : $_" }
+            }
+          }
+          if ($failed) { throw "Offline PowerShell validation failed" }
+
+      - name: Prepare offline framework payload
+        shell: pwsh
+        run: |
+          ./scripts/offline/prepare-windows-payload.ps1 `
+            -PayloadRoot "apps/desktop/build/offline-payload" `
+            -Commit "${{ github.sha }}" `
+            -PythonVersion "3.11" `
+            -NodeVersion "22" `
+            -GitVersion "2.54.0"
+
+      - name: Smoke-test offline provisioning
+        shell: pwsh
+        run: |
+          $smokeRoot = Join-Path $env:RUNNER_TEMP "hermes-offline-smoke"
+          $browserRoot = Join-Path $env:RUNNER_TEMP "hermes-offline-smoke-browsers"
+          ./scripts/offline/install-offline.ps1 `
+            -PayloadRoot "apps/desktop/build/offline-payload" `
+            -HermesHome $smokeRoot `
+            -BrowserCacheRoot $browserRoot
+          $python = Join-Path $smokeRoot "hermes-agent/venv/Scripts/python.exe"
+          $env:PYTHONPATH = Join-Path $smokeRoot "hermes-agent"
+          & $python -c "import hermes_cli; print(hermes_cli.__file__)"
+          if ($LASTEXITCODE -ne 0) { throw "Offline Hermes import smoke test failed" }
+
+      - name: Build offline NSIS installer
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          WIN_CSC_LINK: ""
+          WIN_CSC_KEY_PASSWORD: ""
+        working-directory: apps/desktop
+        run: |
+          npm run build
+          npm run builder -- --win nsis --x64 --config electron-builder.offline.cjs
+
+      - name: Create SHA-256 checksum
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "apps/desktop/release/Hermes-Offline-*-windows-x64.exe" -File
+          if ($installer.Count -ne 1) {
+            throw "Expected exactly one offline installer, found $($installer.Count)"
+          }
+          $hash = Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256
+          "$($hash.Hash.ToLowerInvariant())  $($installer.Name)" |
+            Set-Content -LiteralPath "$($installer.FullName).sha256" -Encoding ascii
+
+      - name: Upload offline installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: hermes-windows-x64-offline
+          path: |
+            apps/desktop/release/Hermes-Offline-*-windows-x64.exe
+            apps/desktop/release/Hermes-Offline-*-windows-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 30
