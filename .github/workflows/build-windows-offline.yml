@@ -1,7 +1,19 @@
 name: Build Windows offline installer
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional tag to publish after a successful build
+        required: false
+        type: string
+      release_title:
+        description: Required with release_tag when publishing a Release
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -17,6 +29,19 @@ jobs:
     timeout-minutes: 240
 
     steps:
+      - name: Validate release inputs
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TITLE: ${{ inputs.release_title }}
+        run: |
+          $hasTag = -not [string]::IsNullOrWhiteSpace($env:RELEASE_TAG)
+          $hasTitle = -not [string]::IsNullOrWhiteSpace($env:RELEASE_TITLE)
+          if ($hasTag -ne $hasTitle) {
+            throw "release_tag and release_title must either both be supplied or both be empty"
+          }
+
       - name: Checkout source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -115,3 +140,43 @@ jobs:
             apps/desktop/release/Hermes-Offline-*-windows-x64.exe.sha256
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release_tag != '' &&
+      inputs.release_title != ''
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download offline installer
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hermes-windows-x64-offline
+          path: release
+
+      - name: Publish unsigned Windows x64 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TITLE: ${{ inputs.release_title }}
+          RELEASE_NOTES: |
+            Self-contained Hermes Desktop and framework installer for Windows x64.
+
+            This installer is unsigned and may trigger a Windows SmartScreen warning.
+            It includes Python, Node.js, PortableGit, agent-browser, and Chrome for Testing.
+            It does not include a model, model server, or model weights. Configure a local
+            or network model provider separately after installation.
+        run: |
+          gh release create "$RELEASE_TAG" \
+            release/Hermes-Offline-*-windows-x64.exe \
+            release/Hermes-Offline-*-windows-x64.exe.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TITLE" \
+            --notes "$RELEASE_NOTES"
