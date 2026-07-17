@@ -117,7 +117,7 @@ try {
     Invoke-CommandWithRetry -Description "Root Node dependency installation" -Command {
         & npm ci --workspaces=false --ignore-scripts --no-audit --no-fund
     }
-    $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $resolvedPayloadRoot "ms-playwright"
+    $env:AGENT_BROWSER_HOME = Join-Path $resolvedPayloadRoot "agent-browser-home"
     $agentBrowser = Join-Path $nodeProject "node_modules\.bin\agent-browser.cmd"
     if (-not (Test-Path -LiteralPath $agentBrowser -PathType Leaf)) {
         throw "agent-browser command was not installed at $agentBrowser"
@@ -169,7 +169,7 @@ foreach ($requiredPath in @(
     (Join-Path $nodePayloadRoot "node.exe"),
     (Join-Path $gitPayloadRoot "cmd\git.exe"),
     (Join-Path $nodeModulesPayloadRoot ".bin\agent-browser.cmd"),
-    (Join-Path $resolvedPayloadRoot "ms-playwright"),
+    (Join-Path $resolvedPayloadRoot "agent-browser-home"),
     (Join-Path $resolvedPayloadRoot "manifest.json")
 )) {
     if (-not (Test-Path -Path $requiredPath)) {

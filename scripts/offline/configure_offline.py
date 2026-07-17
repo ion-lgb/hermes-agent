@@ -17,6 +17,7 @@ YamlValue: TypeAlias = (
 )
 
 _COMMIT_RE = re.compile(r"[0-9a-fA-F]{7,40}")
+_BROWSER_ENV_KEYS = {"AGENT_BROWSER_HOME", "AGENT_BROWSER_EXECUTABLE_PATH"}
 
 
 def _read_config(config_path: Path) -> dict[str, YamlValue]:
@@ -49,6 +50,26 @@ def _offline_config(config: dict[str, YamlValue]) -> dict[str, YamlValue]:
     return updated
 
 
+def _offline_env(env_path: Path, browser_home: Path, browser_executable: Path) -> str:
+    values = {
+        "AGENT_BROWSER_HOME": str(browser_home),
+        "AGENT_BROWSER_EXECUTABLE_PATH": str(browser_executable),
+    }
+    if any("\n" in value or "\r" in value for value in values.values()):
+        raise ValueError("browser paths must not contain newline characters")
+
+    existing_lines = (
+        env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+    )
+    preserved_lines = [
+        line
+        for line in existing_lines
+        if line.partition("=")[0].strip() not in _BROWSER_ENV_KEYS
+    ]
+    configured_lines = [f"{key}={value}" for key, value in values.items()]
+    return "\n".join([*preserved_lines, *configured_lines]) + "\n"
+
+
 def _atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -56,7 +77,14 @@ def _atomic_write(path: Path, content: str) -> None:
     os.replace(temporary_path, path)
 
 
-def configure_offline(config_path: Path, marker_path: Path, commit: str) -> None:
+def configure_offline(
+    config_path: Path,
+    marker_path: Path,
+    env_path: Path,
+    browser_home: Path,
+    browser_executable: Path,
+    commit: str,
+) -> None:
     """Disable runtime installs and write a valid desktop bootstrap marker."""
 
     if _COMMIT_RE.fullmatch(commit) is None:
@@ -74,21 +102,33 @@ def configure_offline(config_path: Path, marker_path: Path, commit: str) -> None
     }
     config_text = yaml.safe_dump(config, sort_keys=False, allow_unicode=True)
     marker_text = json.dumps(marker, indent=2, ensure_ascii=False) + "\n"
+    env_text = _offline_env(env_path, browser_home, browser_executable)
     _atomic_write(config_path, config_text)
     _atomic_write(marker_path, marker_text)
+    _atomic_write(env_path, env_text)
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--marker", type=Path, required=True)
+    parser.add_argument("--env-file", type=Path, required=True)
+    parser.add_argument("--browser-home", type=Path, required=True)
+    parser.add_argument("--browser-executable", type=Path, required=True)
     parser.add_argument("--commit", required=True)
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
-    configure_offline(args.config, args.marker, args.commit)
+    configure_offline(
+        args.config,
+        args.marker,
+        args.env_file,
+        args.browser_home,
+        args.browser_executable,
+        args.commit,
+    )
 
 
 if __name__ == "__main__":

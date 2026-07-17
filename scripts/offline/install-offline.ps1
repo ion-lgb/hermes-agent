@@ -7,7 +7,7 @@ param(
     [string]$HermesHome,
 
     [Parameter(Mandatory = $true)]
-    [string]$BrowserCacheRoot
+    [string]$BrowserRoot
 )
 
 Set-StrictMode -Version Latest
@@ -59,7 +59,7 @@ $pythonPayloadRoot = Join-Path $resolvedPayloadRoot "python"
 $nodePayloadRoot = Join-Path $resolvedPayloadRoot "node"
 $gitPayloadRoot = Join-Path $resolvedPayloadRoot "git"
 $nodeModulesPayloadRoot = Join-Path $resolvedPayloadRoot "node_modules"
-$browserPayloadRoot = Join-Path $resolvedPayloadRoot "ms-playwright"
+$browserPayloadRoot = Join-Path $resolvedPayloadRoot "agent-browser-home"
 $wheelhouse = Join-Path $resolvedPayloadRoot "wheelhouse"
 $manifestPath = Join-Path $resolvedPayloadRoot "manifest.json"
 
@@ -79,6 +79,11 @@ Assert-File -Path (Join-Path $sourceRoot "hermes_cli\main.py")
 Assert-File -Path (Join-Path $nodePayloadRoot "node.exe")
 Assert-File -Path (Join-Path $gitPayloadRoot "cmd\git.exe")
 Assert-File -Path $manifestPath
+
+$browserCandidates = @(Get-ChildItem -LiteralPath $browserPayloadRoot -Filter "chrome.exe" -File -Recurse)
+if ($browserCandidates.Count -ne 1) {
+    throw "Expected exactly one offline chrome.exe in $browserPayloadRoot, found $($browserCandidates.Count)"
+}
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 if (-not $manifest.commit -or $manifest.commit -notmatch "^[0-9a-fA-F]{7,40}$") {
@@ -123,10 +128,17 @@ try {
     Copy-DirectoryContents -Source $nodePayloadRoot -Destination $nodeRoot
     Copy-DirectoryContents -Source $gitPayloadRoot -Destination $gitRoot
 
-    if (Test-Path -LiteralPath $BrowserCacheRoot) {
-        Remove-Item -LiteralPath $BrowserCacheRoot -Recurse -Force
+    if (Test-Path -LiteralPath $BrowserRoot) {
+        Remove-Item -LiteralPath $BrowserRoot -Recurse -Force
     }
-    Copy-DirectoryContents -Source $browserPayloadRoot -Destination $BrowserCacheRoot
+    Copy-DirectoryContents -Source $browserPayloadRoot -Destination $BrowserRoot
+    $installedBrowserCandidates = @(
+        Get-ChildItem -LiteralPath $BrowserRoot -Filter "chrome.exe" -File -Recurse
+    )
+    if ($installedBrowserCandidates.Count -ne 1) {
+        throw "Expected exactly one installed chrome.exe in $BrowserRoot, found $($installedBrowserCandidates.Count)"
+    }
+    $browserExecutable = $installedBrowserCandidates[0].FullName
 
     $pythonExe = Join-Path $pythonRoot "python.exe"
     Assert-File -Path $pythonExe
@@ -148,6 +160,9 @@ try {
     & $venvPython $configHelper `
         --config (Join-Path $HermesHome "config.yaml") `
         --marker (Join-Path $agentRoot ".hermes-bootstrap-complete") `
+        --env-file (Join-Path $HermesHome ".env") `
+        --browser-home $BrowserRoot `
+        --browser-executable $browserExecutable `
         --commit ([string]$manifest.commit)
     if ($LASTEXITCODE -ne 0) {
         throw "Configuring offline runtime policy failed with exit code $LASTEXITCODE"

@@ -11,7 +11,8 @@ not include a model or model server.
 The installer contains the Electron desktop application, the Hermes source
 snapshot, a relocatable CPython 3.11 distribution, an offline Python
 wheelhouse for the curated `[all]` dependency set, portable Node.js 22,
-PortableGit, the root Node dependencies, and Playwright Chromium. Optional
+PortableGit, the root Node dependencies, and agent-browser's Chrome for
+Testing runtime. Optional
 providers excluded from `[all]` remain unavailable until installed separately.
 
 The installed layout matches the existing Windows bootstrap contract under
@@ -26,7 +27,7 @@ The installed layout matches the existing Windows bootstrap contract under
   python\
   node\
   git\
-%LOCALAPPDATA%\ms-playwright\
+  agent-browser\
 ```
 
 ## Build architecture
@@ -38,7 +39,7 @@ The manually triggered GitHub Actions workflow runs on `windows-latest` and:
 3. downloads managed CPython into the payload with `uv python install`;
 4. builds a Windows wheelhouse from `.[all]`;
 5. stages portable Node.js and PortableGit;
-6. installs root Node dependencies and Playwright Chromium into the payload;
+6. installs root Node dependencies and Chrome for Testing into the payload;
 7. builds the Electron desktop with an offline-specific electron-builder
    configuration; and
 8. uploads the NSIS EXE and SHA-256 file as workflow artifacts.
@@ -51,7 +52,7 @@ successful provisioning to avoid retaining a second copy.
 ## Offline provisioning
 
 The provisioning script accepts explicit payload, Hermes home, and browser
-cache directories. It reads the source commit from the validated payload
+runtime directories. It reads the source commit from the validated payload
 manifest.
 It validates every required payload component before mutating the destination,
 copies the source and portable runtimes, creates a fresh venv at its final path,
@@ -59,7 +60,8 @@ and installs with `--no-index --find-links`. It never invokes `uv`, Git, npm,
 winget, or a URL on the target computer.
 
 The installer preserves an existing `config.yaml`, changing only
-`security.allow_lazy_installs` to `false`. It writes the existing schema-1
+`security.allow_lazy_installs` to `false`. It preserves `.env` while setting
+the bundled browser home and executable path. It writes the existing schema-1
 bootstrap marker using the build commit so the Electron resolver uses the
 installed venv and does not start the online bootstrap path.
 
@@ -67,9 +69,9 @@ installed venv and does not start the online bootstrap path.
 
 The source snapshot deliberately excludes `.git`; desktop update checks then
 report that self-update is unsupported without contacting a remote. Lazy Python
-dependency installation is disabled. Playwright Chromium is installed in its
-normal Windows cache path, so browser tools do not download a browser on first
-use.
+dependency installation is disabled. Chrome for Testing is installed under
+Hermes home and selected explicitly, so browser tools do not download a browser
+on first use.
 
 Cloud providers, web search, external browsing, OAuth, messaging services, and
 other network-backed tools still require network access by definition. Users

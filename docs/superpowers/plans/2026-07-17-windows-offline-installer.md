@@ -40,12 +40,12 @@
 - Create: `scripts/offline/install-offline.ps1`
 
 **Interfaces:**
-- Consumes: `-PayloadRoot`, `-HermesHome`, and `-BrowserCacheRoot`; the commit
+- Consumes: `-PayloadRoot`, `-HermesHome`, and `-BrowserRoot`; the commit
   is read from the payload manifest.
 - Produces: a runnable `%LOCALAPPDATA%\hermes\hermes-agent\venv` and schema-1 bootstrap marker.
 
 - [ ] Implement payload validation before destination mutation.
-- [ ] Copy source, Python, Node, Git, Node dependencies, and Chromium to their canonical locations.
+- [ ] Copy source, Python, Node, Git, Node dependencies, and Chrome for Testing to their canonical locations.
 - [ ] Create the venv and install `.[all]` from the wheelhouse with `--no-index --find-links`.
 - [ ] Invoke `configure_offline.py` and fail explicitly on any non-zero process exit.
 - [ ] Add a PowerShell parser check to the GitHub workflow before packaging.
@@ -91,7 +91,7 @@
 - Produces: a complete `apps/desktop/build/offline-payload` directory, NSIS EXE, and SHA-256 file.
 
 - [ ] Stage a clean tracked source snapshot and the installer scripts.
-- [ ] Stage managed CPython, uv-built wheelhouse, Node, PortableGit, root Node dependencies, and Playwright Chromium.
+- [ ] Stage managed CPython, uv-built wheelhouse, Node, PortableGit, root Node dependencies, and Chrome for Testing.
 - [ ] Add a payload manifest with the source commit and resolved runtime versions.
 - [ ] Add a manual `workflow_dispatch` Windows job using immutable action SHAs.
 - [ ] Smoke-test provisioning into a temporary Hermes home before building NSIS.
