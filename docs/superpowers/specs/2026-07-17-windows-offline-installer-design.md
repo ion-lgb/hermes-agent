@@ -85,3 +85,24 @@ managed-Node PATH contract. The workflow smoke-tests the generated payload by
 running the network-free provisioning script in a temporary Hermes home, then
 imports `hermes_cli` from the created venv. The workflow also verifies that the
 final NSIS EXE and SHA-256 file exist before upload.
+
+## Signing and release publishing
+
+The fork currently has no Windows Authenticode certificate, Azure Trusted
+Signing configuration, or related Actions secrets. The installer therefore
+remains unsigned; a self-signed certificate is not used because it would not
+establish Windows trust or improve SmartScreen reputation.
+
+Release publishing is opt-in through an optional manual workflow input. A
+dispatch with an empty release tag continues to build only the retained
+Actions artifact. When a release tag is supplied, the same Windows job creates
+a non-draft, non-prerelease GitHub Release after the payload smoke test, NSIS
+build, and checksum generation succeed. It uploads the EXE and `.sha256`
+directly from the runner, so the large files do not pass through a developer
+workstation.
+
+The first release uses tag `windows-offline-v0.17.0` and title
+`Hermes Desktop 0.17.0 – Windows x64 Offline`. Release notes state that the
+installer is unsigned, supports Windows x64, includes the framework and
+browser runtime, excludes models, and still requires a separately configured
+model provider.
