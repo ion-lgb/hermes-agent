@@ -112,12 +112,15 @@ $nodeProject = Join-Path $resolvedPayloadRoot "node-project"
 New-Item -ItemType Directory -Path $nodeProject -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "package.json") -Destination $nodeProject
 Copy-Item -LiteralPath (Join-Path $repoRoot "package-lock.json") -Destination $nodeProject
+$agentBrowserSourceRoot = Join-Path $env:USERPROFILE ".agent-browser"
+if (Test-Path -LiteralPath $agentBrowserSourceRoot) {
+    Remove-Item -LiteralPath $agentBrowserSourceRoot -Recurse -Force
+}
 Push-Location $nodeProject
 try {
     Invoke-CommandWithRetry -Description "Root Node dependency installation" -Command {
         & npm ci --workspaces=false --ignore-scripts --no-audit --no-fund
     }
-    $env:AGENT_BROWSER_HOME = Join-Path $resolvedPayloadRoot "agent-browser-home"
     $agentBrowser = Join-Path $nodeProject "node_modules\.bin\agent-browser.cmd"
     if (-not (Test-Path -LiteralPath $agentBrowser -PathType Leaf)) {
         throw "agent-browser command was not installed at $agentBrowser"
@@ -128,6 +131,11 @@ try {
 } finally {
     Pop-Location
 }
+$agentBrowserPayloadRoot = Join-Path $resolvedPayloadRoot "agent-browser-home"
+if (-not (Test-Path -LiteralPath $agentBrowserSourceRoot -PathType Container)) {
+    throw "agent-browser did not create its browser home at $agentBrowserSourceRoot"
+}
+Copy-Item -LiteralPath $agentBrowserSourceRoot -Destination $agentBrowserPayloadRoot -Recurse -Force
 $nodeModulesPayloadRoot = Join-Path $resolvedPayloadRoot "node_modules"
 Move-Item -LiteralPath (Join-Path $nodeProject "node_modules") -Destination $nodeModulesPayloadRoot
 Remove-Item -LiteralPath $nodeProject -Recurse -Force
