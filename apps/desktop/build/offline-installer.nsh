@@ -15,4 +15,5 @@
     DetailPrint "The offline payload could not be removed completely; the installed framework is usable."
     ClearErrors
   ${EndIf}
+  SetErrorLevel 0
 !macroend

@@ -150,6 +150,14 @@ jobs:
             if (Test-Path -LiteralPath $logPath) {
               Get-Content -LiteralPath $logPath -Raw | Write-Host
             }
+            $failedInstallPython = Join-Path $installedHermesHome "hermes-agent/venv/Scripts/python.exe"
+            $failedInstallPythonExists = Test-Path -LiteralPath $failedInstallPython -PathType Leaf
+            Write-Host "Installed Python exists after failure: $failedInstallPythonExists"
+            if ($failedInstallPythonExists) {
+              $env:PYTHONPATH = Join-Path $installedHermesHome "hermes-agent"
+              & $failedInstallPython -c "import hermes_cli; print(hermes_cli.__file__)"
+              Write-Host "Hermes import exit code after installer failure: $LASTEXITCODE"
+            }
             throw "Final NSIS installer failed with exit code $($process.ExitCode)"
           }
 
