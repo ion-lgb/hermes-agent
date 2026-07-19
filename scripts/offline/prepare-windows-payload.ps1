@@ -136,8 +136,27 @@ if (-not (Test-Path -LiteralPath $agentBrowserSourceRoot -PathType Container)) {
     throw "agent-browser did not create its browser home at $agentBrowserSourceRoot"
 }
 Copy-Item -LiteralPath $agentBrowserSourceRoot -Destination $agentBrowserPayloadRoot -Recurse -Force
-$nodeDependenciesPayloadRoot = Join-Path $resolvedPayloadRoot "node-dependencies"
-Move-Item -LiteralPath (Join-Path $nodeProject "node_modules") -Destination $nodeDependenciesPayloadRoot
+$nodeDependenciesSourceRoot = Join-Path $nodeProject "node_modules"
+$nodeDependenciesArchive = Join-Path $resolvedPayloadRoot "node-dependencies.zip"
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory(
+    $nodeDependenciesSourceRoot,
+    $nodeDependenciesArchive,
+    [System.IO.Compression.CompressionLevel]::Optimal,
+    $false
+)
+$nodeDependenciesZip = [System.IO.Compression.ZipFile]::OpenRead($nodeDependenciesArchive)
+try {
+    $agentBrowserArchiveEntry = @(
+        $nodeDependenciesZip.Entries |
+            Where-Object { $_.FullName -eq ".bin/agent-browser.cmd" }
+    )
+    if ($agentBrowserArchiveEntry.Count -ne 1) {
+        throw "Expected agent-browser in $nodeDependenciesArchive, found $($agentBrowserArchiveEntry.Count) entries"
+    }
+} finally {
+    $nodeDependenciesZip.Dispose()
+}
 Remove-Item -LiteralPath $nodeProject -Recurse -Force
 
 $gitTag = "v$GitVersion.windows.1"
@@ -176,7 +195,7 @@ foreach ($requiredPath in @(
     (Join-Path $pythonPayloadRoot "*"),
     (Join-Path $nodePayloadRoot "node.exe"),
     (Join-Path $gitPayloadRoot "cmd\git.exe"),
-    (Join-Path $nodeDependenciesPayloadRoot ".bin\agent-browser.cmd"),
+    $nodeDependenciesArchive,
     (Join-Path $resolvedPayloadRoot "agent-browser-home"),
     (Join-Path $resolvedPayloadRoot "manifest.json")
 )) {

@@ -70,7 +70,7 @@ $sourceRoot = Join-Path $resolvedPayloadRoot "hermes-agent"
 $pythonPayloadRoot = Join-Path $resolvedPayloadRoot "python"
 $nodePayloadRoot = Join-Path $resolvedPayloadRoot "node"
 $gitPayloadRoot = Join-Path $resolvedPayloadRoot "git"
-$nodeDependenciesPayloadRoot = Join-Path $resolvedPayloadRoot "node-dependencies"
+$nodeDependenciesArchive = Join-Path $resolvedPayloadRoot "node-dependencies.zip"
 $browserPayloadRoot = Join-Path $resolvedPayloadRoot "agent-browser-home"
 $wheelhouse = Join-Path $resolvedPayloadRoot "wheelhouse"
 $manifestPath = Join-Path $resolvedPayloadRoot "manifest.json"
@@ -80,7 +80,6 @@ foreach ($requiredDirectory in @(
     $pythonPayloadRoot,
     $nodePayloadRoot,
     $gitPayloadRoot,
-    $nodeDependenciesPayloadRoot,
     $browserPayloadRoot,
     $wheelhouse
 )) {
@@ -90,6 +89,7 @@ Assert-File -Path (Join-Path $sourceRoot "pyproject.toml")
 Assert-File -Path (Join-Path $sourceRoot "hermes_cli\main.py")
 Assert-File -Path (Join-Path $nodePayloadRoot "node.exe")
 Assert-File -Path (Join-Path $gitPayloadRoot "cmd\git.exe")
+Assert-File -Path $nodeDependenciesArchive
 Assert-File -Path $manifestPath
 
 $browserCandidates = @(Get-ChildItem -LiteralPath $browserPayloadRoot -Filter "chrome.exe" -File -Recurse)
@@ -129,7 +129,11 @@ if (Test-Path -LiteralPath $agentRoot) {
 
 try {
     Copy-DirectoryContents -Source $sourceRoot -Destination $agentRoot
-    Copy-DirectoryContents -Source $nodeDependenciesPayloadRoot -Destination (Join-Path $agentRoot "node_modules")
+    $installedNodeModules = Join-Path $agentRoot "node_modules"
+    New-Item -ItemType Directory -Path $installedNodeModules -Force | Out-Null
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($nodeDependenciesArchive, $installedNodeModules)
+    Assert-File -Path (Join-Path $installedNodeModules ".bin\agent-browser.cmd")
 
     foreach ($runtimeRoot in @($pythonRoot, $nodeRoot, $gitRoot)) {
         if (Test-Path -LiteralPath $runtimeRoot) {
