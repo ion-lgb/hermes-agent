@@ -100,11 +100,21 @@ jobs:
         run: |
           $smokeRoot = Join-Path $env:RUNNER_TEMP "hermes-offline-smoke"
           $browserRoot = Join-Path $env:RUNNER_TEMP "hermes-offline-smoke-browser"
-          ./scripts/offline/install-offline.ps1 `
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
+            -NoLogo `
+            -NoProfile `
+            -NonInteractive `
+            -ExecutionPolicy Bypass `
+            -File "scripts/offline/install-offline.ps1" `
             -PayloadRoot "apps/desktop/build/offline-payload" `
             -HermesHome $smokeRoot `
             -BrowserRoot $browserRoot `
             -LogPath (Join-Path $env:RUNNER_TEMP "hermes-offline-smoke.log")
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content -LiteralPath (Join-Path $env:RUNNER_TEMP "hermes-offline-smoke.log") -Raw |
+              Write-Host
+            throw "Windows PowerShell 5.1 offline provisioning failed with exit code $LASTEXITCODE"
+          }
           $python = Join-Path $smokeRoot "hermes-agent/venv/Scripts/python.exe"
           $env:PYTHONPATH = Join-Path $smokeRoot "hermes-agent"
           & $python -c "import hermes_cli; print(hermes_cli.__file__)"

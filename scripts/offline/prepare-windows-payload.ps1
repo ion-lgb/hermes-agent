@@ -195,6 +195,7 @@ foreach ($requiredPath in @(
     (Join-Path $pythonPayloadRoot "*"),
     (Join-Path $nodePayloadRoot "node.exe"),
     (Join-Path $gitPayloadRoot "cmd\git.exe"),
+    (Join-Path $gitPayloadRoot "usr\bin\unzip.exe"),
     $nodeDependenciesArchive,
     (Join-Path $resolvedPayloadRoot "agent-browser-home"),
     (Join-Path $resolvedPayloadRoot "manifest.json")

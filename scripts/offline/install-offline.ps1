@@ -89,6 +89,8 @@ Assert-File -Path (Join-Path $sourceRoot "pyproject.toml")
 Assert-File -Path (Join-Path $sourceRoot "hermes_cli\main.py")
 Assert-File -Path (Join-Path $nodePayloadRoot "node.exe")
 Assert-File -Path (Join-Path $gitPayloadRoot "cmd\git.exe")
+$unzipExe = Join-Path $gitPayloadRoot "usr\bin\unzip.exe"
+Assert-File -Path $unzipExe
 Assert-File -Path $nodeDependenciesArchive
 Assert-File -Path $manifestPath
 
@@ -131,8 +133,10 @@ try {
     Copy-DirectoryContents -Source $sourceRoot -Destination $agentRoot
     $installedNodeModules = Join-Path $agentRoot "node_modules"
     New-Item -ItemType Directory -Path $installedNodeModules -Force | Out-Null
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($nodeDependenciesArchive, $installedNodeModules)
+    & $unzipExe -q $nodeDependenciesArchive -d $installedNodeModules
+    if ($LASTEXITCODE -ne 0) {
+        throw "Extracting offline Node dependencies failed with exit code $LASTEXITCODE"
+    }
     Assert-File -Path (Join-Path $installedNodeModules ".bin\agent-browser.cmd")
 
     foreach ($runtimeRoot in @($pythonRoot, $nodeRoot, $gitRoot)) {
@@ -212,6 +216,10 @@ try {
     }
     throw
 }
+} catch {
+    Write-Host "Offline installation failed: $($_.Exception.Message)"
+    Write-Host $_.ScriptStackTrace
+    throw
 } finally {
     Stop-Transcript | Out-Null
 }
