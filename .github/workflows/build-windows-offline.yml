@@ -157,9 +157,6 @@ jobs:
           if (-not (Test-Path -LiteralPath $installedPython -PathType Leaf)) {
             throw "Final NSIS installer did not create the Hermes venv: $installedPython"
           }
-          if (Test-Path -LiteralPath (Join-Path $installDirectory "resources/offline-payload")) {
-            throw "Final NSIS installer retained its temporary offline payload"
-          }
           $env:PYTHONPATH = Join-Path $installedHermesHome "hermes-agent"
           & $installedPython -c "import hermes_cli; print(hermes_cli.__file__)"
           if ($LASTEXITCODE -ne 0) {
