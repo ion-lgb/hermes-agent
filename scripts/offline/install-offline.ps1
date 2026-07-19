@@ -70,7 +70,7 @@ $sourceRoot = Join-Path $resolvedPayloadRoot "hermes-agent"
 $pythonPayloadRoot = Join-Path $resolvedPayloadRoot "python"
 $nodePayloadRoot = Join-Path $resolvedPayloadRoot "node"
 $gitPayloadRoot = Join-Path $resolvedPayloadRoot "git"
-$nodeModulesPayloadRoot = Join-Path $resolvedPayloadRoot "node_modules"
+$nodeDependenciesPayloadRoot = Join-Path $resolvedPayloadRoot "node-dependencies"
 $browserPayloadRoot = Join-Path $resolvedPayloadRoot "agent-browser-home"
 $wheelhouse = Join-Path $resolvedPayloadRoot "wheelhouse"
 $manifestPath = Join-Path $resolvedPayloadRoot "manifest.json"
@@ -80,7 +80,7 @@ foreach ($requiredDirectory in @(
     $pythonPayloadRoot,
     $nodePayloadRoot,
     $gitPayloadRoot,
-    $nodeModulesPayloadRoot,
+    $nodeDependenciesPayloadRoot,
     $browserPayloadRoot,
     $wheelhouse
 )) {
@@ -129,7 +129,7 @@ if (Test-Path -LiteralPath $agentRoot) {
 
 try {
     Copy-DirectoryContents -Source $sourceRoot -Destination $agentRoot
-    Copy-DirectoryContents -Source $nodeModulesPayloadRoot -Destination (Join-Path $agentRoot "node_modules")
+    Copy-DirectoryContents -Source $nodeDependenciesPayloadRoot -Destination (Join-Path $agentRoot "node_modules")
 
     foreach ($runtimeRoot in @($pythonRoot, $nodeRoot, $gitRoot)) {
         if (Test-Path -LiteralPath $runtimeRoot) {

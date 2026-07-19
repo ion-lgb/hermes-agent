@@ -136,8 +136,8 @@ if (-not (Test-Path -LiteralPath $agentBrowserSourceRoot -PathType Container)) {
     throw "agent-browser did not create its browser home at $agentBrowserSourceRoot"
 }
 Copy-Item -LiteralPath $agentBrowserSourceRoot -Destination $agentBrowserPayloadRoot -Recurse -Force
-$nodeModulesPayloadRoot = Join-Path $resolvedPayloadRoot "node_modules"
-Move-Item -LiteralPath (Join-Path $nodeProject "node_modules") -Destination $nodeModulesPayloadRoot
+$nodeDependenciesPayloadRoot = Join-Path $resolvedPayloadRoot "node-dependencies"
+Move-Item -LiteralPath (Join-Path $nodeProject "node_modules") -Destination $nodeDependenciesPayloadRoot
 Remove-Item -LiteralPath $nodeProject -Recurse -Force
 
 $gitTag = "v$GitVersion.windows.1"
@@ -176,7 +176,7 @@ foreach ($requiredPath in @(
     (Join-Path $pythonPayloadRoot "*"),
     (Join-Path $nodePayloadRoot "node.exe"),
     (Join-Path $gitPayloadRoot "cmd\git.exe"),
-    (Join-Path $nodeModulesPayloadRoot ".bin\agent-browser.cmd"),
+    (Join-Path $nodeDependenciesPayloadRoot ".bin\agent-browser.cmd"),
     (Join-Path $resolvedPayloadRoot "agent-browser-home"),
     (Join-Path $resolvedPayloadRoot "manifest.json")
 )) {
