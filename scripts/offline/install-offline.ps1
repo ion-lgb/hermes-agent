@@ -103,15 +103,12 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 if (-not $manifest.commit -or $manifest.commit -notmatch "^[0-9a-fA-F]{7,40}$") {
     throw "Offline payload manifest has an invalid commit: $manifestPath"
 }
-
-$pythonCandidates = @(
-    Get-ChildItem -LiteralPath $pythonPayloadRoot -Filter "python.exe" -File -Recurse |
-        Where-Object { $_.FullName -notmatch "\\Scripts\\" }
-)
-if ($pythonCandidates.Count -ne 1) {
-    throw "Expected exactly one managed python.exe in $pythonPayloadRoot, found $($pythonCandidates.Count)"
+if (-not $manifest.pythonExecutable) {
+    throw "Offline payload manifest does not specify pythonExecutable: $manifestPath"
 }
-$pythonDistributionRoot = Split-Path -Parent $pythonCandidates[0].FullName
+$payloadPythonExecutable = Join-Path $resolvedPayloadRoot ([string]$manifest.pythonExecutable)
+Assert-File -Path $payloadPythonExecutable
+$pythonDistributionRoot = Split-Path -Parent $payloadPythonExecutable
 
 $agentRoot = Join-Path $HermesHome "hermes-agent"
 $venvRoot = Join-Path $agentRoot "venv"

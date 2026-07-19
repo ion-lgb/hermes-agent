@@ -84,6 +84,16 @@ $pythonPayloadRoot = Join-Path $resolvedPayloadRoot "python"
 Invoke-CommandWithRetry -Description "Managed Python download" -Command {
     & uv python install $PythonVersion --install-dir $pythonPayloadRoot --no-bin --reinstall
 }
+$pythonExecutableCandidates = @(
+    Get-ChildItem -LiteralPath $pythonPayloadRoot -Filter "python.exe" -File -Recurse |
+        Where-Object { $_.FullName -notmatch "\\Scripts\\" }
+)
+if ($pythonExecutableCandidates.Count -ne 1) {
+    $candidatePaths = $pythonExecutableCandidates.FullName -join ", "
+    throw "Expected exactly one managed Python executable, found $($pythonExecutableCandidates.Count): $candidatePaths"
+}
+$pythonExecutablePath = $pythonExecutableCandidates[0].FullName
+$pythonExecutableRelativePath = $pythonExecutablePath.Substring($resolvedPayloadRoot.Length + 1)
 
 $wheelhouse = Join-Path $resolvedPayloadRoot "wheelhouse"
 New-Item -ItemType Directory -Path $wheelhouse -Force | Out-Null
@@ -178,6 +188,7 @@ $manifest = [ordered]@{
     schemaVersion = 1
     commit = $Commit.ToLowerInvariant()
     pythonVersion = $PythonVersion
+    pythonExecutable = $pythonExecutableRelativePath
     nodeVersion = $resolvedNodeVersion
     gitVersion = $GitVersion
     createdAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
