@@ -181,6 +181,38 @@ jobs:
             throw "Final NSIS Hermes import smoke test failed"
           }
 
+          $modelSaveProbe = @'
+          import asyncio
+          import os
+          from pathlib import Path
+
+          os.environ["HERMES_HOME"] = os.environ["HERMES_MODEL_SAVE_HOME"]
+
+          from hermes_cli.web_server import ModelAssignment, set_model_assignment
+
+          result = asyncio.run(set_model_assignment(ModelAssignment(
+              scope="main",
+              provider="custom",
+              model="offline-smoke-model",
+              base_url="http://127.0.0.1:11434/v1",
+              api_key="offline-smoke-key",
+          )))
+          config_path = Path(os.environ["HERMES_MODEL_SAVE_HOME"]) / "config.yaml"
+          config_text = config_path.read_text(encoding="utf-8")
+          assert result["ok"] is True, result
+          assert "offline-smoke-model" in config_text, config_text
+          assert "http://127.0.0.1:11434/v1" in config_text, config_text
+          print(config_text)
+          '@
+          $modelSaveProbePath = Join-Path $env:RUNNER_TEMP "probe-model-save.py"
+          $modelSaveHome = Join-Path $env:RUNNER_TEMP "hermes-model-save"
+          Set-Content -LiteralPath $modelSaveProbePath -Value $modelSaveProbe -Encoding utf8
+          $env:HERMES_MODEL_SAVE_HOME = $modelSaveHome
+          & $installedPython $modelSaveProbePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Installed Hermes failed to save a local model assignment"
+          }
+
       - name: Create SHA-256 checksum
         shell: pwsh
         run: |
