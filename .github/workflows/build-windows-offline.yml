@@ -103,7 +103,8 @@ jobs:
           ./scripts/offline/install-offline.ps1 `
             -PayloadRoot "apps/desktop/build/offline-payload" `
             -HermesHome $smokeRoot `
-            -BrowserRoot $browserRoot
+            -BrowserRoot $browserRoot `
+            -LogPath (Join-Path $env:RUNNER_TEMP "hermes-offline-smoke.log")
           $python = Join-Path $smokeRoot "hermes-agent/venv/Scripts/python.exe"
           $env:PYTHONPATH = Join-Path $smokeRoot "hermes-agent"
           & $python -c "import hermes_cli; print(hermes_cli.__file__)"
@@ -119,6 +120,51 @@ jobs:
         run: |
           npm run build
           npm run builder -- --win nsis --x64 --config electron-builder.offline.cjs
+
+      - name: Smoke-test final NSIS installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "apps/desktop/release/Hermes-Offline-*-windows-x64.exe" -File
+          if ($installer.Count -ne 1) {
+            throw "Expected exactly one offline installer, found $($installer.Count)"
+          }
+
+          $installedHermesHome = Join-Path $env:LOCALAPPDATA "hermes"
+          $installDirectory = Join-Path $env:RUNNER_TEMP "HermesOfflineApp"
+          foreach ($path in @($installedHermesHome, $installDirectory)) {
+            if (Test-Path -LiteralPath $path) {
+              Remove-Item -LiteralPath $path -Recurse -Force
+            }
+          }
+
+          $process = Start-Process `
+            -FilePath $installer.FullName `
+            -ArgumentList @("/S", "/D=$installDirectory") `
+            -PassThru
+          if (-not $process.WaitForExit(900000)) {
+            $process.Kill()
+            throw "Final NSIS installer did not exit within 15 minutes"
+          }
+          if ($process.ExitCode -ne 0) {
+            $logPath = Join-Path $installedHermesHome "logs/offline-install.log"
+            if (Test-Path -LiteralPath $logPath) {
+              Get-Content -LiteralPath $logPath -Raw | Write-Host
+            }
+            throw "Final NSIS installer failed with exit code $($process.ExitCode)"
+          }
+
+          $installedPython = Join-Path $installedHermesHome "hermes-agent/venv/Scripts/python.exe"
+          if (-not (Test-Path -LiteralPath $installedPython -PathType Leaf)) {
+            throw "Final NSIS installer did not create the Hermes venv: $installedPython"
+          }
+          if (Test-Path -LiteralPath (Join-Path $installDirectory "resources/offline-payload")) {
+            throw "Final NSIS installer retained its temporary offline payload"
+          }
+          $env:PYTHONPATH = Join-Path $installedHermesHome "hermes-agent"
+          & $installedPython -c "import hermes_cli; print(hermes_cli.__file__)"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Final NSIS Hermes import smoke test failed"
+          }
 
       - name: Create SHA-256 checksum
         shell: pwsh

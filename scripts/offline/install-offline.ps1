@@ -7,12 +7,24 @@ param(
     [string]$HermesHome,
 
     [Parameter(Mandatory = $true)]
-    [string]$BrowserRoot
+    [string]$BrowserRoot,
+
+    [Parameter(Mandatory = $true)]
+    [string]$LogPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+
+$logDirectory = Split-Path -Parent $LogPath
+if (-not $logDirectory) {
+    throw "LogPath must include a parent directory: $LogPath"
+}
+New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+Start-Transcript -LiteralPath $LogPath -Force | Out-Null
+
+try {
 
 function Assert-Directory {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -195,4 +207,7 @@ try {
         Move-Item -LiteralPath $backupRoot -Destination $agentRoot
     }
     throw
+}
+} finally {
+    Stop-Transcript | Out-Null
 }
